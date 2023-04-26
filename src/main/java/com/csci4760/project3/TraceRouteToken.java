@@ -1,54 +1,36 @@
 package com.csci4760.project3;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 @Getter
-public final class TraceRouteToken implements Comparable<TraceRouteToken> {
-
-    private static final DecimalFormat DECIMAL_FORMAT = new DecimalFormat("#.###");
+@EqualsAndHashCode(callSuper = false)
+public class TraceRouteToken {
 
     private final int ttl;
-    private final String destIP;
-    private final List<Float> responseTimes;
+    private final String ipAddr;
+    private final List<Double> times;
 
-    public TraceRouteToken(int ttl, String destIP) {
+    public TraceRouteToken(int ttl, String ipAddr) {
         this.ttl = ttl;
-        this.destIP = destIP;
-        this.responseTimes = new ArrayList<>();
+        this.ipAddr = ipAddr;
+        times = new ArrayList<>();
     }
 
-    public void addResponseTime(float responseTime) {
-        responseTimes.add(responseTime);
-    }
-
-    @Override
-    public int compareTo(TraceRouteToken o) {
-        return ttl - o.getTtl();
+    public void addTime(double time) {
+        times.add(time);
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("TTL ").append(ttl).append('\n').append(destIP).append('\n');
-        responseTimes.forEach(responseTime ->
-                sb.append(String.format(DECIMAL_FORMAT.format(responseTime))).append(" ms\n"));
+        sb.append("TTL ").append(ttl).append('\n')
+                .append(ipAddr).append('\n');
+        times.forEach(time -> sb.append(time).append(" ms\n"));
         return sb.toString();
     }
-
-    @Override
-    public boolean equals(Object obj) {
-        return obj instanceof TraceRouteToken t && ttl == t.getTtl() && Objects.equals(destIP, t.getDestIP());
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(ttl, destIP);
-    }
-
 
 }

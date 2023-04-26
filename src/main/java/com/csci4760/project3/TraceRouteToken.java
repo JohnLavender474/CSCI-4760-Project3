@@ -3,6 +3,7 @@ package com.csci4760.project3;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.List;
 

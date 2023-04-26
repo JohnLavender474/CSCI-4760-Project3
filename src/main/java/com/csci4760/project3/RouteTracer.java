@@ -8,13 +8,12 @@ import java.util.regex.Pattern;
 
 public class RouteTracer {
 
-    public static final String SRC_STRING = "proto TCP";
-    public static final Pattern ID_REGEX = Pattern.compile("id \\d+");
-    public static final Pattern TTL_REGEX = Pattern.compile("ttl \\d+");
-    public static final Pattern TIME_STAMP_REGEX = Pattern.compile("\\d+\\.\\d+ IP");
-    public static final Pattern IP_REGEX = Pattern.compile("\\d+\\.\\d+\\.\\d+\\.\\d+ > \\d+\\.\\d+\\.\\d+\\.\\d+");
+    static final String SRC_STRING = "proto TCP";
+    static final Pattern ID_REGEX = Pattern.compile("id \\d+");
+    static final Pattern TTL_REGEX = Pattern.compile("ttl \\d+");
+    static final Pattern IP_REGEX = Pattern.compile("\\d+\\.\\d+\\.\\d+\\.\\d+ > \\d+\\.\\d+\\.\\d+\\.\\d+");
 
-    public record TTL_ID_Key(int ttl, int id) {
+    record TTL_ID_Key(int ttl, int id) {
     }
 
     /**
@@ -34,7 +33,10 @@ public class RouteTracer {
         // scan file, collect sources and respones
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
-            double timeStamp = Double.parseDouble(match(line.split(" ")[0], TIME_STAMP_REGEX));
+            if (line.isBlank()) {
+                continue;
+            }
+            double timeStamp = Double.parseDouble((line.split(" ")[0]));
             boolean isSrc = line.contains(SRC_STRING);
             // if is source, then fetch source information and continue while loop
             if (isSrc) {
@@ -61,13 +63,13 @@ public class RouteTracer {
         return new ArrayList<>(tokenMap.values());
     }
 
-    private static TTL_ID_Key fetchTTL_ID_Key(String line) {
+    static TTL_ID_Key fetchTTL_ID_Key(String line) {
         int srcTTL = Integer.parseInt(match(line, TTL_REGEX).split(" ")[1]);
         int srcID = Integer.parseInt(match(line, ID_REGEX).split(" ")[1]);
         return new TTL_ID_Key(srcTTL, srcID);
     }
 
-    private static String match(String string, Pattern pattern) {
+    static String match(String string, Pattern pattern) {
         Matcher matcher = pattern.matcher(string);
         if (matcher.find()) {
             return matcher.group();
@@ -75,8 +77,9 @@ public class RouteTracer {
         throw new RuntimeException("No match in string [" + string + "] for pattern [" + pattern + "]");
     }
 
-    private static double calculateTime(double start, double end) {
-        return (end - start) * 1000;
+    static double calculateTime(double srcTimeStamp, double respTimeStamp) {
+        double time = (respTimeStamp - srcTimeStamp) * 1000;
+        return Math.round(time * 100.0) / 100.0;
     }
 
 }

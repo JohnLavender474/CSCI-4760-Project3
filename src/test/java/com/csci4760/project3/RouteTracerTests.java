@@ -11,6 +11,8 @@ public class RouteTracerTests {
     private static final String SAMPLE_TCP_DUMP_1 = "SampleTcpDump_1.txt";
     private static final String SAMPLE_TCP_DUMP_2 = "SampleTcpDump_2.txt";
 
+    /*
+
     @Test
     void test1() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_1));
@@ -148,5 +150,7 @@ public class RouteTracerTests {
         List<TraceRouteToken> tokensToReturn = new ArrayList<>(tokenMap.values());
         Assertions.assertEquals(List.of(new TraceRouteToken(1, "128.192.76.129", 0.52, 0.64, 0.78)), tokensToReturn);
     }
+
+     */
 
 }

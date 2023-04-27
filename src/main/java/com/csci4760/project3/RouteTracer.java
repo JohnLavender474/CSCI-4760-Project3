@@ -13,34 +13,36 @@ public class RouteTracer {
     static final Pattern TTL_REGEX = Pattern.compile("ttl \\d+");
     static final Pattern IP_REGEX = Pattern.compile("\\d+\\.\\d+\\.\\d+\\.\\d+ > \\d+\\.\\d+\\.\\d+\\.\\d+");
 
-    record TTL_ID_Key(int ttl, int id) {
+    record Source(int ttl, double time) {
     }
 
-    /**
-     *
-     *
-     * @param src
-     * @return
-     * @throws FileNotFoundException
-     */
+    record Response(String ipAddr, double time) {
+    }
+
     public static List<TraceRouteToken> traceRoute(String src) throws FileNotFoundException {
         Scanner scanner = new Scanner(new File(src));
         // source map: src ttl and src id for key, src time stamp for value
         // use linked hash map to retain insertion order
-        Map<TTL_ID_Key, Double> srcMap = new LinkedHashMap<>();
+        Map<Integer, Source> srcMap = new LinkedHashMap<>();
         // response map: src ttl and src id for key, resp time stamp and resp IP for value
-        Map<TTL_ID_Key, Map.Entry<Double, String>> respMap = new HashMap<>();
+        Map<Integer, Response> respMap = new HashMap<>();
         // scan file, collect sources and respones
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
             if (line.isBlank()) {
                 continue;
             }
-            double timeStamp = Double.parseDouble((line.split(" ")[0]));
+            double timeStamp;
+            try {
+                timeStamp = Double.parseDouble((line.split(" ")[0]));
+            } catch (NumberFormatException ignore) {
+                continue;
+            }
             boolean isSrc = line.contains(SRC_STRING);
             // if is source, then fetch source information and continue while loop
             if (isSrc) {
-                srcMap.put(fetchTTL_ID_Key(line), timeStamp);
+                int srcTtl = fetchTTL(line);
+                srcMap.put(fetchId(line), new Source(srcTtl, timeStamp));
                 scanner.nextLine();
                 continue;
             }
@@ -48,25 +50,31 @@ public class RouteTracer {
             line = scanner.nextLine();
             String destIpAddr = match(line, IP_REGEX).split(" ")[0];
             line = scanner.nextLine();
-            respMap.put(fetchTTL_ID_Key(line), Map.entry(timeStamp, destIpAddr));
+            respMap.put(fetchId(line), new Response(destIpAddr, timeStamp));
         }
         // collect trace route tokens
         Map<Integer, TraceRouteToken> tokenMap = new TreeMap<>();
-        srcMap.forEach(((ttl_id_key, startTime) -> {
-            Map.Entry<Double, String> respEntry = respMap.get(ttl_id_key);
-            int ttl = ttl_id_key.ttl();
-            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, respEntry.getValue()));
-            double time = calculateTime(startTime, respEntry.getKey());
+        srcMap.forEach(((id, source) -> {
+            Response response = respMap.get(id);
+            // Map.Entry<Double, String> respEntry = respMap.get(ttl_id_key);
+            if (response == null) {
+                return;
+            }
+            int ttl = source.ttl();
+            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, response.ipAddr()));
+            double time = calculateTime(source.time(), response.time());
             token.addTime(time);
             tokenMap.put(ttl, token);
         }));
         return new ArrayList<>(tokenMap.values());
     }
 
-    static TTL_ID_Key fetchTTL_ID_Key(String line) {
-        int srcTTL = Integer.parseInt(match(line, TTL_REGEX).split(" ")[1]);
-        int srcID = Integer.parseInt(match(line, ID_REGEX).split(" ")[1]);
-        return new TTL_ID_Key(srcTTL, srcID);
+    static int fetchId(String line) {
+        return Integer.parseInt(match(line, ID_REGEX).split(" ")[1]);
+    }
+
+    static int fetchTTL(String line) {
+        return Integer.parseInt(match(line, TTL_REGEX).split(" ")[1]);
     }
 
     static String match(String string, Pattern pattern) {

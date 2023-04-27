@@ -5,6 +5,7 @@ import lombok.Getter;
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Getter
@@ -19,6 +20,11 @@ public class TraceRouteToken {
         this.ttl = ttl;
         this.ipAddr = ipAddr;
         times = new ArrayList<>();
+    }
+
+    public TraceRouteToken(int ttl, String ipAddr, double... times) {
+        this(ttl, ipAddr);
+        Arrays.stream(times).forEach(this::addTime);
     }
 
     public void addTime(double time) {

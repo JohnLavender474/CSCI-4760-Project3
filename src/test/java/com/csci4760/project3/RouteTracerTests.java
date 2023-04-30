@@ -11,8 +11,6 @@ public class RouteTracerTests {
     private static final String SAMPLE_TCP_DUMP_1 = "SampleTcpDump_1.txt";
     private static final String SAMPLE_TCP_DUMP_2 = "SampleTcpDump_2.txt";
 
-    /*
-
     @Test
     void test1() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_1));
@@ -34,8 +32,10 @@ public class RouteTracerTests {
     void test3() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_1));
         String line = scanner.nextLine();
-        RouteTracer.TTL_ID_Key ttl_id_key = RouteTracer.fetchTTL_ID_Key(line);
-        Assertions.assertEquals(new RouteTracer.TTL_ID_Key(1, 42733), ttl_id_key);
+        int ttl = RouteTracer.fetchTTL(line);
+        int id = RouteTracer.fetchId(line);
+        Assertions.assertEquals(1, ttl);
+        Assertions.assertEquals(42733, id);
         scanner.close();
     }
 
@@ -68,7 +68,7 @@ public class RouteTracerTests {
     void test6() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_1));
         String line = scanner.nextLine();
-        RouteTracer.TTL_ID_Key ttl_id_key = RouteTracer.fetchTTL_ID_Key(line);
+        int ttl = RouteTracer.fetchTTL(line);
         double srcTimeStamp = Double.parseDouble(line.split(" ")[0]);
         scanner.nextLine();
         line = scanner.nextLine();
@@ -76,7 +76,7 @@ public class RouteTracerTests {
         double time = RouteTracer.calculateTime(srcTimeStamp, respTimeStamp);
         line = scanner.nextLine();
         String destIpAddr = RouteTracer.match(line, RouteTracer.IP_REGEX).split(" ")[0];
-        TraceRouteToken token = new TraceRouteToken(ttl_id_key.ttl(), destIpAddr);
+        TraceRouteToken token = new TraceRouteToken(ttl, destIpAddr);
         token.addTime(time);
         Assertions.assertEquals(new TraceRouteToken(1, "128.192.76.129", 0.52), token);
     }
@@ -84,31 +84,40 @@ public class RouteTracerTests {
     @Test
     void test7() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_1));
-        Map<RouteTracer.TTL_ID_Key, Double> srcMap = new LinkedHashMap<>();
-        Map<RouteTracer.TTL_ID_Key, Map.Entry<Double, String>> respMap = new HashMap<>();
+        Map<Integer, RouteTracer.Source> srcMap = new LinkedHashMap<>();
+        Map<Integer, RouteTracer.Response> respMap = new HashMap<>();
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
             if (line.isBlank()) {
                 continue;
             }
-            double timeStamp = Double.parseDouble((line.split(" ")[0]));
+            double timeStamp;
+            try {
+                timeStamp = Double.parseDouble((line.split(" ")[0]));
+            } catch (NumberFormatException ignore) {
+                continue;
+            }
             boolean isSrc = line.contains(RouteTracer.SRC_STRING);
             if (isSrc) {
-                srcMap.put(RouteTracer.fetchTTL_ID_Key(line), timeStamp);
+                int srcTtl = RouteTracer.fetchTTL(line);
+                srcMap.put(RouteTracer.fetchId(line), new RouteTracer.Source(srcTtl, timeStamp));
                 scanner.nextLine();
                 continue;
             }
             line = scanner.nextLine();
             String destIpAddr = RouteTracer.match(line, RouteTracer.IP_REGEX).split(" ")[0];
             line = scanner.nextLine();
-            respMap.put(RouteTracer.fetchTTL_ID_Key(line), Map.entry(timeStamp, destIpAddr));
+            respMap.put(RouteTracer.fetchId(line), new RouteTracer.Response(destIpAddr, timeStamp));
         }
         Map<Integer, TraceRouteToken> tokenMap = new TreeMap<>();
-        srcMap.forEach(((ttl_id_key, startTime) -> {
-            Map.Entry<Double, String> respEntry = respMap.get(ttl_id_key);
-            int ttl = ttl_id_key.ttl();
-            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, respEntry.getValue()));
-            double time = RouteTracer.calculateTime(startTime, respEntry.getKey());
+        srcMap.forEach(((id, source) -> {
+            RouteTracer.Response response = respMap.get(id);
+            if (response == null) {
+                return;
+            }
+            int ttl = source.ttl();
+            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, response.ipAddr()));
+            double time = RouteTracer.calculateTime(source.time(), response.time());
             token.addTime(time);
             tokenMap.put(ttl, token);
         }));
@@ -119,38 +128,45 @@ public class RouteTracerTests {
     @Test
     void test8() throws Exception {
         Scanner scanner = new Scanner(new File(SAMPLE_TCP_DUMP_2));
-        Map<RouteTracer.TTL_ID_Key, Double> srcMap = new LinkedHashMap<>();
-        Map<RouteTracer.TTL_ID_Key, Map.Entry<Double, String>> respMap = new HashMap<>();
+        Map<Integer, RouteTracer.Source> srcMap = new LinkedHashMap<>();
+        Map<Integer, RouteTracer.Response> respMap = new HashMap<>();
         while (scanner.hasNextLine()) {
             String line = scanner.nextLine();
             if (line.isBlank()) {
                 continue;
             }
-            double timeStamp = Double.parseDouble((line.split(" ")[0]));
+            double timeStamp;
+            try {
+                timeStamp = Double.parseDouble((line.split(" ")[0]));
+            } catch (NumberFormatException ignore) {
+                continue;
+            }
             boolean isSrc = line.contains(RouteTracer.SRC_STRING);
             if (isSrc) {
-                srcMap.put(RouteTracer.fetchTTL_ID_Key(line), timeStamp);
+                int srcTtl = RouteTracer.fetchTTL(line);
+                srcMap.put(RouteTracer.fetchId(line), new RouteTracer.Source(srcTtl, timeStamp));
                 scanner.nextLine();
                 continue;
             }
             line = scanner.nextLine();
             String destIpAddr = RouteTracer.match(line, RouteTracer.IP_REGEX).split(" ")[0];
             line = scanner.nextLine();
-            respMap.put(RouteTracer.fetchTTL_ID_Key(line), Map.entry(timeStamp, destIpAddr));
+            respMap.put(RouteTracer.fetchId(line), new RouteTracer.Response(destIpAddr, timeStamp));
         }
         Map<Integer, TraceRouteToken> tokenMap = new TreeMap<>();
-        srcMap.forEach(((ttl_id_key, startTime) -> {
-            Map.Entry<Double, String> respEntry = respMap.get(ttl_id_key);
-            int ttl = ttl_id_key.ttl();
-            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, respEntry.getValue()));
-            double time = RouteTracer.calculateTime(startTime, respEntry.getKey());
+        srcMap.forEach(((id, source) -> {
+            RouteTracer.Response response = respMap.get(id);
+            if (response == null) {
+                return;
+            }
+            int ttl = source.ttl();
+            TraceRouteToken token = tokenMap.getOrDefault(ttl, new TraceRouteToken(ttl, response.ipAddr()));
+            double time = RouteTracer.calculateTime(source.time(), response.time());
             token.addTime(time);
             tokenMap.put(ttl, token);
         }));
         List<TraceRouteToken> tokensToReturn = new ArrayList<>(tokenMap.values());
         Assertions.assertEquals(List.of(new TraceRouteToken(1, "128.192.76.129", 0.52, 0.64, 0.78)), tokensToReturn);
     }
-
-     */
 
 }
